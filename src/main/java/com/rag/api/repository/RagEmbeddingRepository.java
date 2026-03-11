@@ -13,7 +13,7 @@ import java.util.UUID;
 public interface RagEmbeddingRepository extends JpaRepository<RagEmbedding, UUID> {
 
     @Query(value = """
-        SELECT content
+        SELECT file_name || ' -> ' || content
         FROM rag_embeddings
         ORDER BY embedding <-> CAST(:vector AS vector)
         LIMIT 7
