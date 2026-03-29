@@ -13,10 +13,10 @@ import java.util.UUID;
 public interface RagEmbeddingRepository extends JpaRepository<RagEmbedding, UUID> {
 
     @Query(value = """
-        SELECT file_name || ' -> ' || content
-        FROM rag_embeddings
-        ORDER BY embedding <-> CAST(:vector AS vector)
-        LIMIT 7
-        """, nativeQuery = true)
-    List<String> searchSimilar(@Param("vector") String vector);
+    SELECT document_id, content
+    FROM rag_embeddings
+    ORDER BY embedding <-> CAST(:vector AS vector)
+    LIMIT 7
+    """, nativeQuery = true)
+    List<Object[]> searchSimilar(@Param("vector") String vector);
 }

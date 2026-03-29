@@ -46,9 +46,10 @@ public class OllamaService {
         String url = ollamaUrl + "/api/generate";
 
         Map<String, Object> options = new HashMap<>();
-        options.put("temperature", 0.2);
-        options.put("num_predict", 210); // limite de tokens
+        options.put("temperature", 0.0);
+        options.put("num_predict", 120); // limite de tokens
         options.put("num_ctx", 2048);
+        options.put("repeat_penalty", 1.2);
 
         Map<String, Object> body = new HashMap<>();
         body.put("model", model);
