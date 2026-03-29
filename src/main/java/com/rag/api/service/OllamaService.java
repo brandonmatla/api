@@ -49,7 +49,7 @@ public class OllamaService {
         options.put("temperature", 0.0);
         options.put("num_predict", 200); // limite de tokens
         options.put("num_ctx", 2048);
-        options.put("repeat_penalty", 1.2);
+        options.put("repeat_penalty", 1.8);
 
         Map<String, Object> body = new HashMap<>();
         body.put("model", model);

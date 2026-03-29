@@ -16,7 +16,14 @@ public class RagController {
 
     @PostMapping("/ask")
     public String ask(@RequestBody QuestionRequest request) {
+        long start = System.currentTimeMillis();
+
         System.out.println("Pregunta: "+request.getQuestion());
-        return ragService.ask(request.getQuestion());
+        String respuesta=ragService.ask(request.getQuestion());
+
+        long end = System.currentTimeMillis();
+        System.out.println("LLM tiempo: " + (end - start)/1000 + "Seg");
+
+        return respuesta;
     }
 }

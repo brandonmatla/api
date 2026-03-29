@@ -26,7 +26,7 @@ public class RagService {
     }
 
     public String ask(String question) {
-        long start = System.currentTimeMillis();
+
         // 🔹 1. Embedding
         List<Double> embedding = ollamaService.generateEmbedding(question);
         String vector = VectorUtil.toPgVector(embedding);
@@ -84,12 +84,9 @@ public class RagService {
                 - Si no puedes responder → responde EXACTAMENTE:
                   No se encontró información en los documentos
 
-                FORMATO:
-
-                archivo.pdf - descripción breve
+                FORMATO (solo si aplica):
                 
-                si no tiene nada que ver con la informacion no contestes con ese formato solo si encuentras 
-                informacion del archivo.
+                archivo.pdf - descripción breve
 
                 PREGUNTA:
                 %s
@@ -107,9 +104,6 @@ public class RagService {
         if (!contieneValido) {
             return "No se encontró información en los documentos";
         }
-
-        long end = System.currentTimeMillis();
-        System.out.println("LLM tiempo: " + (end - start)/1000 + "Seg");
 
         return respuesta;
     }
