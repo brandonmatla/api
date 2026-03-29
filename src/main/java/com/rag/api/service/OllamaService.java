@@ -41,13 +41,13 @@ public class OllamaService {
 
     public String generateResponse(String prompt) {
 
-        long start = System.currentTimeMillis();
+
 
         String url = ollamaUrl + "/api/generate";
 
         Map<String, Object> options = new HashMap<>();
         options.put("temperature", 0.0);
-        options.put("num_predict", 120); // limite de tokens
+        options.put("num_predict", 200); // limite de tokens
         options.put("num_ctx", 2048);
         options.put("repeat_penalty", 1.2);
 
@@ -60,8 +60,7 @@ public class OllamaService {
         ResponseEntity<Map> response =
                 restTemplate.postForEntity(url, body, Map.class);
 
-        long end = System.currentTimeMillis();
-        System.out.println("LLM tiempo: " + (end - start)/1000 + "Seg");
+
 
         return response.getBody().get("response").toString();
     }

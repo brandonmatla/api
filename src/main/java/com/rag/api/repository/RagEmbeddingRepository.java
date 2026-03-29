@@ -16,7 +16,7 @@ public interface RagEmbeddingRepository extends JpaRepository<RagEmbedding, UUID
     SELECT document_id, content
     FROM rag_embeddings
     ORDER BY embedding <-> CAST(:vector AS vector)
-    LIMIT 7
+    LIMIT 25
     """, nativeQuery = true)
     List<Object[]> searchSimilar(@Param("vector") String vector);
 }

@@ -16,7 +16,7 @@ public class RagController {
 
     @PostMapping("/ask")
     public String ask(@RequestBody QuestionRequest request) {
-
+        System.out.println("Pregunta: "+request.getQuestion());
         return ragService.ask(request.getQuestion());
     }
 }

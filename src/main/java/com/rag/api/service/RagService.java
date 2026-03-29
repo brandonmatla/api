@@ -7,9 +7,6 @@ import com.rag.api.util.VectorUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,139 +26,91 @@ public class RagService {
     }
 
     public String ask(String question) {
-
-        // 1. Generar embedding
+        long start = System.currentTimeMillis();
+        // 🔹 1. Embedding
         List<Double> embedding = ollamaService.generateEmbedding(question);
         String vector = VectorUtil.toPgVector(embedding);
 
-        // 2. Buscar chunks similares
+        // 🔹 2. Buscar contexto (LIMITADO)
         List<Object[]> results = repository.searchSimilar(vector);
 
-        // 3. Agrupar contenido por document_id 🔥 (CLAVE)
-        Map<Object, String> contextByDoc = results.stream()
-                .collect(Collectors.groupingBy(
-                        r -> r[0], // 🔥 SIN toString()
-                        Collectors.mapping(r -> r[1].toString(), Collectors.joining("\n"))
-                ));
+        String context = results.stream()
+                .limit(5) // 🔥 menos ruido
+                .map(r -> {
+                    String content = r[1].toString();
 
-        // 4. Construir DOCUMENTOS base
+                    // 🔥 recorte duro
+                    if (content.length() > 300) {
+                        content = content.substring(0, 300);
+                    }
 
-        List<RagDocument> docs = contextByDoc.keySet().stream()
-                .map(key -> {
-                    UUID id = key instanceof UUID ? (UUID) key : UUID.fromString(key.toString());
-                    return archivos.findById(id).orElse(null);
+                    return content;
                 })
-                .filter(Objects::nonNull)
+                .collect(Collectors.joining("\n---\n"));
+
+        // 🔹 3. Obtener documentos reales
+        List<RagDocument> docs = archivos.findAll();
+
+        List<String> nombresValidos = docs.stream()
+                .map(RagDocument::getFileName)
                 .toList();
 
         String documentos = docs.stream()
                 .map(doc -> """
                         {
-                          "id": "%s",
-                          "name": "%s",
-                          "createdAt": "%s"
+                          "name": "%s"
                         }
-                        """.formatted(
-                        doc.getId(),
-                        doc.getFileName(),
-                        doc.getCreatedAt()
-                ))
+                        """.formatted(doc.getFileName()))
                 .collect(Collectors.joining(","));
 
         documentos = "[" + documentos + "]";
 
-        // 5. Construir DOCUMENTOS + CONTENIDO (🔥 RAG real)
-        String documentosConContenido = contextByDoc.entrySet()
-                .stream()
-                .map(entry -> {
-                    Object key = entry.getKey();
-
-                    UUID docId;
-
-                    if (key instanceof UUID) {
-                        docId = (UUID) key;
-                    } else {
-                        docId = UUID.fromString(key.toString());
-                    }
-
-                    var doc = archivos.findById(docId).orElse(null);
-                    if (doc == null) return null;
-
-                    return """
-                                {
-                                  "id": "%s",
-                                  "name": "%s",
-                                  "content": "%s"
-                                }
-                            """.formatted(
-                            doc.getId(),
-                            doc.getFileName(),
-                            entry.getValue().replace("\"", "'")
-                    );
-                })
-                .filter(e -> e != null)
-                .collect(Collectors.joining(","));
-
-        documentosConContenido = "[" + documentosConContenido + "]";
-
-        // DEBUG (opcional)
-        System.out.println("DOCUMENTOS:");
-        System.out.println(documentos);
-        System.out.println("\nDOCUMENTOS_CON_CONTENIDO:");
-        System.out.println(documentosConContenido);
-
-        // 6. Prompt final (blindado)
+        // 🔹 4. PROMPT (simplificado y más fuerte)
         String prompt = """
-                Eres un asistente que responde preguntas sobre documentos.
-                
+                TE LLAMAS Braney.
+                Responde usando SOLO los nombres EXACTOS de DOCUMENTOS.
+
                 DOCUMENTOS:
                 %s
-                
-                DOCUMENTOS_CON_CONTENIDO:
+
+                CONTEXTO:
                 %s
+
+                REGLAS:
+
+                - SOLO puedes usar nombres de DOCUMENTOS
+                - NO inventar nombres
+                - NO explicar nada fuera del formato
+                - Si no puedes responder → responde EXACTAMENTE:
+                  No se encontró información en los documentos
+
+                FORMATO:
+
+                archivo.pdf - descripción breve
                 
-                REGLAS OBLIGATORIAS:
-                
-                1. Los nombres de archivos SOLO pueden salir del campo "name" en DOCUMENTOS.
-                2. El campo "content" SOLO se usa para describir, NUNCA para crear nombres.
-                3. NO inventes nombres.
-                4. NO modifiques nombres.
-                5. NO uses conocimiento externo.
-                
-                PROHIBIDO:
-                
-                - Generar nombres desde el content
-                - Inferir nombres
-                - Crear nombres similares
-                - Usar rutas o textos como nombres
-                
-                INSTRUCCIÓN:
-                
-                - Si pide SOLO nombres → responde SOLO con "name"
-                - Si pide nombres y descripción → responde con:
-                  name - descripción basada en content
-                
-                FORMATO OBLIGATORIO:
-                
-                nombre.pdf - descripción breve
-                
-                (Sin números, sin texto extra, sin explicaciones)
-                
-                VALIDACIÓN FINAL:
-                
-                Antes de responder verifica:
-                
-                - Cada nombre existe EXACTAMENTE en DOCUMENTOS
-                
-                Si NO puedes cumplir todo lo anterior, responde EXACTAMENTE:
-                
-                No se encontró información en los documentos
-                
+                si no tiene nada que ver con la informacion no contestes con ese formato solo si encuentras 
+                informacion del archivo.
+
                 PREGUNTA:
                 %s
-                """.formatted(documentos, documentosConContenido, question);
+                """.formatted(documentos, context, question);
 
-        // 7. Ejecutar LLM
-        return ollamaService.generateResponse(prompt);
+        // 🔹 5. Ejecutar modelo
+        String respuesta = ollamaService.generateResponse(prompt);
+
+        System.out.println("\nRESPUESTA RAW:\n" + respuesta);
+
+        // 🔥 6. VALIDACIÓN (CLAVE TOTAL)
+        boolean contieneValido = nombresValidos.stream()
+                .anyMatch(respuesta::contains);
+
+        if (!contieneValido) {
+            return "No se encontró información en los documentos";
+        }
+
+        long end = System.currentTimeMillis();
+        System.out.println("LLM tiempo: " + (end - start)/1000 + "Seg");
+
+        return respuesta;
     }
 }
