@@ -1,5 +1,6 @@
 package com.rag.api.service;
 
+import com.rag.api.entity.RagDocument;
 import com.rag.api.repository.RagDocumentRepository;
 import com.rag.api.repository.RagEmbeddingRepository;
 import com.rag.api.util.VectorUtil;
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,8 +45,16 @@ public class RagService {
                 ));
 
         // 4. Construir DOCUMENTOS base
-        String documentos = archivos.findAll()
-                .stream()
+
+        List<RagDocument> docs = contextByDoc.keySet().stream()
+                .map(key -> {
+                    UUID id = key instanceof UUID ? (UUID) key : UUID.fromString(key.toString());
+                    return archivos.findById(id).orElse(null);
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        String documentos = docs.stream()
                 .map(doc -> """
                         {
                           "id": "%s",
@@ -78,12 +88,12 @@ public class RagService {
                     if (doc == null) return null;
 
                     return """
-                {
-                  "id": "%s",
-                  "name": "%s",
-                  "content": "%s"
-                }
-            """.formatted(
+                                {
+                                  "id": "%s",
+                                  "name": "%s",
+                                  "content": "%s"
+                                }
+                            """.formatted(
                             doc.getId(),
                             doc.getFileName(),
                             entry.getValue().replace("\"", "'")
@@ -103,83 +113,50 @@ public class RagService {
         // 6. Prompt final (blindado)
         String prompt = """
                 Eres un asistente que responde preguntas sobre documentos.
-
+                
                 DOCUMENTOS:
                 %s
-
+                
                 DOCUMENTOS_CON_CONTENIDO:
                 %s
-
-                REGLA CRÍTICA:
-
-                Cada objeto contiene:
-                - name → nombre real del archivo
-                - content → contenido del documento
-
-                PROHIBIDO ABSOLUTO:
-
-                - Inventar nombres de archivos
-                - Crear nombres basados en números (ej: 4.14)
-                - Generar rutas (ej: documentos/xxx)
-                - Usar nombres que no estén en DOCUMENTOS
-
-                Si haces eso, la respuesta es incorrecta.
-
-                INSTRUCCIÓN:
-
-                - Si pide nombres → usa SOLO "name"
-                - Si pide descripción → usa "content" del MISMO documento
-
-                FORMATO:
-
-                archivo.pdf - descripción breve
-
-                REGLAS:
-
-                - NO inventar
-                - NO usar conocimiento externo
-                - NO explicar de más
-                - SOLO usar los datos proporcionados
-
-                VALIDACIÓN:
                 
-                Antes de responder, verifica:
+                REGLAS OBLIGATORIAS:
                 
-                - ¿El nombre existe EXACTAMENTE en DOCUMENTOS?
-                - Si no existe → NO lo uses
-                
-                Si no hay información suficiente → responde:
-                
-                "No se encontró información en los documentos"
-                
-                FORMATO ESTRICTO (OBLIGATORIO):
-                
-                Cada línea debe cumplir EXACTAMENTE:
-                
-                nombre.pdf - descripción
+                1. Los nombres de archivos SOLO pueden salir del campo "name" en DOCUMENTOS.
+                2. El campo "content" SOLO se usa para describir, NUNCA para crear nombres.
+                3. NO inventes nombres.
+                4. NO modifiques nombres.
+                5. NO uses conocimiento externo.
                 
                 PROHIBIDO:
-                - listas numeradas
-                - texto antes o después
-                - explicaciones
                 
-                REGLA DE DECISIÓN:
+                - Generar nombres desde el content
+                - Inferir nombres
+                - Crear nombres similares
+                - Usar rutas o textos como nombres
                 
-                Antes de responder, debes verificar:
+                INSTRUCCIÓN:
                 
-                1. ¿Existe contenido REAL en DOCUMENTOS_CON_CONTENIDO?
-                2. ¿Ese contenido describe claramente el archivo?
+                - Si pide SOLO nombres → responde SOLO con "name"
+                - Si pide nombres y descripción → responde con:
+                  name - descripción basada en content
                 
-                SI LA RESPUESTA ES NO:
+                FORMATO OBLIGATORIO:
                 
-                Responde EXACTAMENTE:
+                nombre.pdf - descripción breve
+                
+                (Sin números, sin texto extra, sin explicaciones)
+                
+                VALIDACIÓN FINAL:
+                
+                Antes de responder verifica:
+                
+                - Cada nombre existe EXACTAMENTE en DOCUMENTOS
+                
+                Si NO puedes cumplir todo lo anterior, responde EXACTAMENTE:
                 
                 No se encontró información en los documentos
                 
-                NO intentes completar.
-                NO adivines.
-                NO generes contenido.
-
                 PREGUNTA:
                 %s
                 """.formatted(documentos, documentosConContenido, question);
