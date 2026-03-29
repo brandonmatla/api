@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,9 +36,9 @@ public class RagService {
         List<Object[]> results = repository.searchSimilar(vector);
 
         // 3. Agrupar contenido por document_id 🔥 (CLAVE)
-        Map<String, String> contextByDoc = results.stream()
+        Map<Object, String> contextByDoc = results.stream()
                 .collect(Collectors.groupingBy(
-                        r -> r[0].toString(),
+                        r -> r[0], // 🔥 SIN toString()
                         Collectors.mapping(r -> r[1].toString(), Collectors.joining("\n"))
                 ));
 
@@ -63,7 +64,17 @@ public class RagService {
         String documentosConContenido = contextByDoc.entrySet()
                 .stream()
                 .map(entry -> {
-                    var doc = archivos.findById(UUID.fromString(entry.getKey())).orElse(null);
+                    Object key = entry.getKey();
+
+                    UUID docId;
+
+                    if (key instanceof UUID) {
+                        docId = (UUID) key;
+                    } else {
+                        docId = UUID.fromString(key.toString());
+                    }
+
+                    var doc = archivos.findById(docId).orElse(null);
                     if (doc == null) return null;
 
                     return """
