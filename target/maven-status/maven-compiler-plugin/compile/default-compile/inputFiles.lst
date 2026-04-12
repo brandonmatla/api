@@ -1,0 +1,10 @@
+D:\documentos\Tesis\back\api\src\main\java\com\ApiApplication.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\config\AppConfig.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\controller\RagController.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\dto\QuestionRequest.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\entity\RagDocument.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\entity\RagEmbedding.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\repository\RagEmbeddingRepository.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\service\OllamaService.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\service\RagService.java
+D:\documentos\Tesis\back\api\src\main\java\com\rag\api\util\VectorUtil.java
